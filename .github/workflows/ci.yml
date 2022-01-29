@@ -1,0 +1,36 @@
+name: Create nuget package
+
+on: 
+  workflow_dispatch:
+    inputs:
+      name:
+        description: 'Version of nuget package'
+        required: true
+        default: '1.0.0'
+
+jobs:
+  build:
+    runs-on: ubuntu-18.04
+    name: Create nuget package
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v1
+
+      - name: Setup .NET Core @ Latest
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: '6.0'
+          
+      - name: Get current date for versioning
+        id: date
+        run: echo "::set-output name=date::$(date +'%Y-%m-%d-%H.%M')" #add in versioning
+          
+      - name: Log in registry
+        run: dotnet nuget add source --username ${{github.actor}} --password ${{ secrets.GITHUB_TOKEN }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/${{github.repository_owner}}/index.json"
+          
+      - name: Build solution and generate NuGet package
+        run: |  
+          dotnet pack -c Release -o out -p:PackageVersion=${{ github.event.inputs.name }}
+
+      - name: Push generated package to GitHub registry
+        run: dotnet nuget push ./out/*.nupkg --skip-duplicate --no-symbols true --api-key ${{secrets.GITHUB_TOKEN}} --source "github"
